@@ -41,21 +41,21 @@ def single_sample_input():
     data = {}
     # Left column
     with col1:
-        data['fixed_acidity'] = st.number_input("Fixed Acidity", value=7.0)
-        data['volatile_acidity'] = st.number_input("Volatile Acidity", value=0.3)
-        data['citric_acid'] = st.number_input("Citric Acid", value=0.3)
-        data['residual_sugar'] = st.number_input("Residual Sugar", value=2.5)
-        data['chlorides'] = st.number_input("Chlorides", value=0.08)
-        data['free_sulfur_dioxide'] = st.number_input("Free Sulfur Dioxide", value=15.0)
+        data['fixed_acidity'] = st.number_input("Fixed Acidity", value=7.0, format="%.2f")
+        data['volatile_acidity'] = st.number_input("Volatile Acidity", value=0.300, format="%.3f")
+        data['citric_acid'] = st.number_input("Citric Acid", value=0.3, format="%.2f")
+        data['residual_sugar'] = st.number_input("Residual Sugar", value=2.5, format="%.2f")
+        data['chlorides'] = st.number_input("Chlorides", value=0.080, format="%.3f")
+        data['free_sulfur_dioxide'] = st.number_input("Free Sulfur Dioxide", value=15.0, format="%.2f")
     # Right column
     with col2:
-        data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0)
-        data['density'] = st.number_input("Density", value=0.996)
-        data['pH'] = st.number_input("pH", value=3.3)
-        data['sulphates'] = st.number_input("Sulphates", value=0.65)
-        data['alcohol'] = st.number_input("Alcohol", value=10.0)
-        data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3)
-        data['sulfur_ratio'] = st.number_input("Sulfur Ratio", value=15.0/46.0)
+        data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0, format="%.2f")
+        data['density'] = st.number_input("Density", value=0.99600, format="%.5f")
+        data['pH'] = st.number_input("pH", value=3.3, format="%.2f")
+        data['sulphates'] = st.number_input("Sulphates", value=0.65, format="%.2f")
+        data['alcohol'] = st.number_input("Alcohol", value=10.0, format="%.2f")
+        data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3, format="%.3f")
+        data['sulfur_ratio'] = st.number_input("Sulfur Ratio", value=15.0/46.0, format="%.3f")
     return pd.DataFrame([data])
 
 def batch_csv_input():
@@ -75,7 +75,7 @@ input_df = single_sample_input() if input_method == "Single Sample" else batch_c
 # -------------------------------
 if st.button("Predict Quality"):
     if input_df is not None and not input_df.empty:
-        # Fill missing columns with 0
+        # Fill missing columns
         for col in feature_cols:
             if col not in input_df.columns:
                 input_df[col] = 0.0
@@ -85,20 +85,14 @@ if st.button("Predict Quality"):
         preds = calibrator.predict(Xt)
         probs = calibrator.predict_proba(Xt)
 
-        # Prepare results
-        results = []
+        # Display results in requested format
+        st.markdown("### Prediction Results:")
         for i, pred in enumerate(preds):
             label = "Good 🍷" if pred == 1 else "Not Good ❌"
             confidence = probs[i][pred]*100
-            results.append({"Prediction": label, "Confidence (%)": round(confidence,2)})
-
-        results_df = pd.DataFrame(results)
-        st.markdown("### Prediction Results")
-        st.dataframe(pd.concat([input_df.reset_index(drop=True), results_df], axis=1))
-
-        # Confidence bars
-        for i, conf in enumerate(probs[:,1]*100):
-            st.progress(int(conf))
+            st.write(f"**Prediction:** {label}")
+            st.write(f"**Confidence:** {confidence:.2f} percent")
+            st.write("---")  # separator between rows for batch inputs
 
 # -------------------------------
 # Feature Importance (Robust)

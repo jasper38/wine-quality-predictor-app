@@ -7,7 +7,7 @@ import joblib
 # Paths
 # -------------------------------
 PIPELINE_PATH = "wine_quality_pipeline.joblib"
-META_PATH = "metadata.joblib"
+META_PATH = "model_metadata.joblib"
 
 # -------------------------------
 # Load pipeline and metadata

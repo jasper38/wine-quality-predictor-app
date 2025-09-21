@@ -1,3 +1,5 @@
+# wine_quality_app_final_v2.py
+
 import streamlit as st
 import pandas as pd
 import joblib
@@ -78,30 +80,35 @@ if st.button("Predict Quality"):
             if col not in input_df.columns:
                 input_df[col] = 0.0
         input_df = input_df[feature_cols]
+
         Xt = preprocessor.transform(input_df)
         preds = calibrator.predict(Xt)
         probs = calibrator.predict_proba(Xt)
+
         # Prepare results
         results = []
         for i, pred in enumerate(preds):
             label = "Good 🍷" if pred == 1 else "Not Good ❌"
             confidence = probs[i][pred]*100
             results.append({"Prediction": label, "Confidence (%)": round(confidence,2)})
+
         results_df = pd.DataFrame(results)
         st.markdown("### Prediction Results")
         st.dataframe(pd.concat([input_df.reset_index(drop=True), results_df], axis=1))
 
-        # Confidence bar for single or batch
+        # Confidence bars
         for i, conf in enumerate(probs[:,1]*100):
             st.progress(int(conf))
 
 # -------------------------------
-# Optional: Feature importance
+# Feature Importance (Robust)
 # -------------------------------
-if hasattr(calibrator.base_estimator, "feature_importances_"):
+# Access underlying estimator safely
+estimator = getattr(calibrator, "estimator", None)
+if estimator is not None and hasattr(estimator, "feature_importances_"):
     st.subheader("Feature Importance")
     fig, ax = plt.subplots(figsize=(8,5))
-    sns.barplot(x=calibrator.base_estimator.feature_importances_, y=feature_cols, palette="mako", ax=ax)
+    sns.barplot(x=estimator.feature_importances_, y=feature_cols, palette="mako", ax=ax)
     ax.set_xlabel("Importance")
     ax.set_ylabel("Feature")
     st.pyplot(fig)

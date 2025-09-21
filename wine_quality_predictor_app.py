@@ -14,7 +14,7 @@ def load_model_and_metadata():
     return model, metadata
 
 model, metadata = load_model_and_metadata()
-feature_names = metadata.get("feature_names")
+feature_names = metadata.get("feature_cols")
 label_mapping = metadata.get("label_mapping", {0: "Not Good ❌", 1: "Good 🍷"})
 
 # -------------------------------

@@ -1,4 +1,4 @@
-# wine_quality_app_final_v2.py
+# wine_quality_app_final_v3.py
 
 import streamlit as st
 import pandas as pd
@@ -62,10 +62,27 @@ def batch_csv_input():
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
+
+        # 1️⃣ Standardize column names
         df.columns = df.columns.str.lower().str.replace(" ", "_")
+
+        # 2️⃣ Compute engineered features if missing
+        if 'acidity_ratio' not in df.columns:
+            df['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
+        if 'sulfur_ratio' not in df.columns:
+            df['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
+
+        # 3️⃣ Add missing numeric columns after engineered features
+        for col in feature_cols:
+            if col not in df.columns:
+                df[col] = 0.0
+
+        # 4️⃣ Reorder columns to match the model
+        input_df = df[feature_cols]
+
         st.subheader("Uploaded CSV Preview")
         st.dataframe(df.head())
-        return df
+        return input_df
     return None
 
 input_df = single_sample_input() if input_method == "Single Sample" else batch_csv_input()
@@ -75,7 +92,7 @@ input_df = single_sample_input() if input_method == "Single Sample" else batch_c
 # -------------------------------
 if st.button("Predict Quality"):
     if input_df is not None and not input_df.empty:
-        # Fill missing columns
+        # Ensure all features exist
         for col in feature_cols:
             if col not in input_df.columns:
                 input_df[col] = 0.0
@@ -88,16 +105,15 @@ if st.button("Predict Quality"):
         # Display results in requested format
         st.markdown("### Prediction Results:")
         for i, pred in enumerate(preds):
-            label = "Good 🍷" if pred == 1 else "Not Good ❌"
+            label = "Good" if pred == 1 else "Not Good"
             confidence = probs[i][pred]*100
             st.write(f"**Prediction:** {label}")
             st.write(f"**Confidence:** {confidence:.2f} percent")
-            st.write("---")  # separator between rows for batch inputs
+            st.write("---")  # separator for batch inputs
 
 # -------------------------------
 # Feature Importance (Robust)
 # -------------------------------
-# Access underlying estimator safely
 estimator = getattr(calibrator, "estimator", None)
 if estimator is not None and hasattr(estimator, "feature_importances_"):
     st.subheader("Feature Importance")

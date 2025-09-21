@@ -61,28 +61,34 @@ def single_sample_input():
 def batch_csv_input():
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file)  # original CSV
+        df_preview = df.copy()           # for display only
 
-        # 1️⃣ Standardize column names
+        # Standardize column names
         df.columns = df.columns.str.lower().str.replace(" ", "_")
 
-        # 2️⃣ Compute engineered features if missing
+        # Compute engineered features only if missing
+        engineered = {}
         if 'acidity_ratio' not in df.columns:
-            df['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
+            engineered['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
         if 'sulfur_ratio' not in df.columns:
-            df['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
+            engineered['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
 
-        # 3️⃣ Add missing numeric columns after engineered features
+        # Create input_df for model
+        input_df = df.copy()
+        for k, v in engineered.items():
+            input_df[k] = v
+
+        # Add missing numeric columns only if truly missing
         for col in feature_cols:
-            if col not in df.columns:
-                df[col] = 0.0
+            if col not in input_df.columns:
+                input_df[col] = 0.0
 
-        # 4️⃣ Reorder columns to match the model
-        input_df = df[feature_cols]
+        # Reorder columns to match model
+        input_df = input_df[feature_cols]
 
         st.subheader("Uploaded CSV Preview")
-        st.dataframe(df.head())
-        return input_df
+        st.dataframe(df_preview.head())  # show original CSV only
     return None
 
 input_df = single_sample_input() if input_method == "Single Sample" else batch_csv_input()

@@ -1,27 +1,25 @@
-# wine_quality_app_final_v3.py
 
 import streamlit as st
 import pandas as pd
 import joblib
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # -------------------------------
-# Load model and metadata
+# Paths
+# -------------------------------
+PIPELINE_PATH = "wine_quality_pipeline.joblib"
+META_PATH = "metadata.joblib"
+
+# -------------------------------
+# Load pipeline and metadata
 # -------------------------------
 @st.cache_resource
-def load_model():
-    model_dict = joblib.load("wine_quality_pipeline.joblib")
-    preprocessor = model_dict['preprocessor']
-    calibrator = model_dict['calibrator']
-    metadata = model_dict['metadata']
-    feature_cols = metadata.get('feature_cols')
-    if feature_cols is None:
-        st.error("Error: 'feature_cols' not found in metadata.")
-        st.stop()
-    return preprocessor, calibrator, feature_cols
+def load_pipeline():
+    pipeline = joblib.load(PIPELINE_PATH)
+    meta = joblib.load(META_PATH)
+    return pipeline, meta
 
-preprocessor, calibrator, feature_cols = load_model()
+pipeline, meta = load_pipeline()
+feature_cols = meta['feature_cols']
 
 # -------------------------------
 # Page config
@@ -37,60 +35,41 @@ input_method = st.radio("Input Method:", ["Single Sample", "Batch CSV Upload"], 
 
 def single_sample_input():
     st.subheader("Wine Sample Features")
-    col1, col2 = st.columns(2)
     data = {}
+    col1, col2 = st.columns(2)
+
     # Left column
     with col1:
-        data['fixed_acidity'] = st.number_input("Fixed Acidity", value=7.0, format="%.2f")
-        data['volatile_acidity'] = st.number_input("Volatile Acidity", value=0.300, format="%.3f")
-        data['citric_acid'] = st.number_input("Citric Acid", value=0.3, format="%.2f")
-        data['residual_sugar'] = st.number_input("Residual Sugar", value=2.5, format="%.2f")
-        data['chlorides'] = st.number_input("Chlorides", value=0.080, format="%.3f")
-        data['free_sulfur_dioxide'] = st.number_input("Free Sulfur Dioxide", value=15.0, format="%.2f")
+        for i, col in enumerate(feature_cols):
+            if i % 2 == 0:
+                data[col] = st.number_input(col, value=0.0, format="%.6f")
     # Right column
     with col2:
-        data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0, format="%.2f")
-        data['density'] = st.number_input("Density", value=0.99600, format="%.5f")
-        data['pH'] = st.number_input("pH", value=3.3, format="%.2f")
-        data['sulphates'] = st.number_input("Sulphates", value=0.65, format="%.2f")
-        data['alcohol'] = st.number_input("Alcohol", value=10.0, format="%.2f")
-        data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3, format="%.3f")
-        data['sulfur_ratio'] = st.number_input("Sulfur Ratio", value=15.0/46.0, format="%.3f")
+        for i, col in enumerate(feature_cols):
+            if i % 2 == 1:
+                data[col] = st.number_input(col, value=0.0, format="%.6f")
+
     return pd.DataFrame([data])
 
 def batch_csv_input():
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)  # original CSV
-        df_preview = df.copy()           # for display only
-
-        # Standardize column names
+        df = pd.read_csv(uploaded_file)
         df.columns = df.columns.str.lower().str.replace(" ", "_")
-
-        # Compute engineered features only if missing
-        engineered = {}
+        # Compute engineered features if missing
         if 'acidity_ratio' not in df.columns:
-            engineered['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
+            df['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
         if 'sulfur_ratio' not in df.columns:
-            engineered['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
-
-        # Create input_df for model
-        input_df = df.copy()
-        for k, v in engineered.items():
-            input_df[k] = v
-
-        # Add missing numeric columns only if truly missing
+            df['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
+        # Add missing columns
         for col in feature_cols:
-            if col not in input_df.columns:
-                input_df[col] = 0.0
-
-        # Reorder columns to match model
-        input_df = input_df[feature_cols]
-
+            if col not in df.columns:
+                df[col] = 0.0
+        # Reorder
+        input_df = df[feature_cols]
         st.subheader("Uploaded CSV Preview")
-        st.dataframe(df_preview.head())  # show original CSV only
-
-        return input_df  # ✅ return the dataframe for prediction
+        st.dataframe(df.head())
+        return input_df
     return None
 
 input_df = single_sample_input() if input_method == "Single Sample" else batch_csv_input()
@@ -100,33 +79,14 @@ input_df = single_sample_input() if input_method == "Single Sample" else batch_c
 # -------------------------------
 if st.button("Predict Quality"):
     if input_df is not None and not input_df.empty:
-        # Ensure all features exist
-        for col in feature_cols:
-            if col not in input_df.columns:
-                input_df[col] = 0.0
-        input_df = input_df[feature_cols]
+        Xt = input_df[feature_cols]
+        pred_prob = pipeline.predict_proba(Xt)[:, 1]
+        pred_class = pipeline.predict(Xt)
 
-        Xt = preprocessor.transform(input_df)
-        preds = calibrator.predict(Xt)
-        probs = calibrator.predict_proba(Xt)
-
-        # Display results in requested format
         st.markdown("### Prediction Results:")
-        for i, pred in enumerate(preds):
-            label = "Good" if pred == 1 else "Not Good"
-            confidence = probs[i][pred]*100
+        for i, pred in enumerate(pred_class):
+            label = "GOOD WINE" if pred == 1 else "NOT GOOD"
+            confidence = pred_prob[i] * 100
             st.write(f"**Prediction:** {label}")
             st.write(f"**Confidence:** {confidence:.2f} percent")
-            st.write("---")  # separator for batch inputs
-
-# -------------------------------
-# Feature Importance (Robust)
-# -------------------------------
-estimator = getattr(calibrator, "estimator", None)
-if estimator is not None and hasattr(estimator, "feature_importances_"):
-    st.subheader("Feature Importance")
-    fig, ax = plt.subplots(figsize=(8,5))
-    sns.barplot(x=estimator.feature_importances_, y=feature_cols, palette="mako", ax=ax)
-    ax.set_xlabel("Importance")
-    ax.set_ylabel("Feature")
-    st.pyplot(fig)
+            st.write("---")

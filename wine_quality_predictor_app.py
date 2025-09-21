@@ -89,6 +89,8 @@ def batch_csv_input():
 
         st.subheader("Uploaded CSV Preview")
         st.dataframe(df_preview.head())  # show original CSV only
+
+        return input_df  # ✅ return the dataframe for prediction
     return None
 
 input_df = single_sample_input() if input_method == "Single Sample" else batch_csv_input()

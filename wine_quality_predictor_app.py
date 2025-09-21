@@ -38,7 +38,8 @@ input_method = st.radio("Input Method:", ["Single Sample", "Batch CSV Upload"], 
 def single_sample_input():
     st.subheader("Wine Sample Features")
     data = {}
-    col1, col2 = st.columns(2)
+
+    col1, col2, col3 = st.columns(3)
 
     # Left column
     with col1:
@@ -46,20 +47,24 @@ def single_sample_input():
         data['volatile_acidity'] = st.number_input("Volatile Acidity", value=0.300, format="%.3f")
         data['citric_acid'] = st.number_input("Citric Acid", value=0.3, format="%.2f")
         data['residual_sugar'] = st.number_input("Residual Sugar", value=2.5, format="%.2f")
+
+    # Middle column
+    with col2:
         data['chlorides'] = st.number_input("Chlorides", value=0.080, format="%.3f")
         data['free_sulfur_dioxide'] = st.number_input("Free Sulfur Dioxide", value=15.0, format="%.2f")
-
-    # Right column
-    with col2:
         data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0, format="%.2f")
         data['density'] = st.number_input("Density", value=0.99600, format="%.5f")
-        data['ph'] = st.number_input("ph", value=3.3, format="%.2f")
+
+    # Right column
+    with col3:
+        data['ph'] = st.number_input("pH", value=3.3, format="%.2f")
         data['sulphates'] = st.number_input("Sulphates", value=0.65, format="%.2f")
         data['alcohol'] = st.number_input("Alcohol", value=10.0, format="%.2f")
         data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3, format="%.3f")
         data['sulfur_ratio'] = st.number_input("Sulfur Ratio", value=15.0/46.0, format="%.3f")
 
     return pd.DataFrame([data])
+
 
 def batch_csv_input():
     uploaded_file = st.file_uploader("Upload CSV", type=["csv"])

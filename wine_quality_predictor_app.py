@@ -1,4 +1,3 @@
-# wine_quality_app_final_v6.py
 
 import streamlit as st
 import pandas as pd
@@ -8,20 +7,21 @@ import joblib
 # Paths
 # -------------------------------
 PIPELINE_PATH = "wine_quality_pipeline.joblib"
-META_PATH = "metadata.joblib"
+META_PATH = "model_metadata.joblib"
 
 # -------------------------------
 # Load pipeline and metadata
 # -------------------------------
 @st.cache_resource
-def load_pipeline():
+def load_pipeline_and_meta():
     pipeline_dict = joblib.load(PIPELINE_PATH)
-    pipeline = pipeline_dict['calibrator']   # calibrated classifier
-    meta = pipeline_dict['metadata']          # metadata
-    return pipeline, meta
+    pipeline = pipeline_dict['calibrator']  # calibrated classifier
+    preprocessor = pipeline_dict['preprocessor']
+    metadata = joblib.load(META_PATH)       # metadata separately
+    feature_cols = metadata['feature_cols']
+    return pipeline, preprocessor, feature_cols
 
-pipeline, meta = load_pipeline()
-feature_cols = meta['feature_cols']
+pipeline, preprocessor, feature_cols = load_pipeline_and_meta()
 
 # -------------------------------
 # Page config
@@ -42,24 +42,22 @@ def single_sample_input():
 
     # Left column
     with col1:
-        for i, col in enumerate(feature_cols):
-            if i % 2 == 0:
-                if col == "volatile_acidity" or col == "chlorides":
-                    data[col] = st.number_input(col, value=0.0, format="%.3f")
-                elif col == "density":
-                    data[col] = st.number_input(col, value=0.0, format="%.5f")
-                else:
-                    data[col] = st.number_input(col, value=0.0, format="%.2f")
+        data['fixed_acidity'] = st.number_input("Fixed Acidity", value=7.0, format="%.2f")
+        data['volatile_acidity'] = st.number_input("Volatile Acidity", value=0.300, format="%.3f")
+        data['citric_acid'] = st.number_input("Citric Acid", value=0.3, format="%.2f")
+        data['residual_sugar'] = st.number_input("Residual Sugar", value=2.5, format="%.2f")
+        data['chlorides'] = st.number_input("Chlorides", value=0.080, format="%.3f")
+        data['free_sulfur_dioxide'] = st.number_input("Free Sulfur Dioxide", value=15.0, format="%.2f")
+
     # Right column
     with col2:
-        for i, col in enumerate(feature_cols):
-            if i % 2 == 1:
-                if col == "volatile_acidity" or col == "chlorides":
-                    data[col] = st.number_input(col, value=0.0, format="%.3f")
-                elif col == "density":
-                    data[col] = st.number_input(col, value=0.0, format="%.5f")
-                else:
-                    data[col] = st.number_input(col, value=0.0, format="%.2f")
+        data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0, format="%.2f")
+        data['density'] = st.number_input("Density", value=0.99600, format="%.5f")
+        data['pH'] = st.number_input("pH", value=3.3, format="%.2f")
+        data['sulphates'] = st.number_input("Sulphates", value=0.65, format="%.2f")
+        data['alcohol'] = st.number_input("Alcohol", value=10.0, format="%.2f")
+        data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3, format="%.3f")
+        data['sulfur_ratio'] = st.number_input("Sulfur Ratio", value=15.0/46.0, format="%.3f")
 
     return pd.DataFrame([data])
 
@@ -68,26 +66,26 @@ def batch_csv_input():
     if uploaded_file is not None:
         df = pd.read_csv(uploaded_file)
         df.columns = df.columns.str.lower().str.replace(" ", "_")
-
-        # Compute engineered features if missing
+                # Compute engineered features if missing
         if 'acidity_ratio' not in df.columns:
             df['acidity_ratio'] = df['fixed_acidity'] / (df['volatile_acidity'] + 1e-6)
         if 'sulfur_ratio' not in df.columns:
             df['sulfur_ratio'] = df['free_sulfur_dioxide'] / (df['total_sulfur_dioxide'] + 1e-6)
 
-        # Add missing columns only if truly missing
+        # Ensure all required feature columns exist
         for col in feature_cols:
             if col not in df.columns:
                 df[col] = 0.0
 
-        # Reorder to match model
+        # Reorder to match training
         input_df = df[feature_cols]
 
         st.subheader("Uploaded CSV Preview")
-        st.dataframe(df.head())
+        st.dataframe(df.head())  # show original CSV preview only
         return input_df
     return None
 
+# Choose input method
 input_df = single_sample_input() if input_method == "Single Sample" else batch_csv_input()
 
 # -------------------------------
@@ -95,14 +93,16 @@ input_df = single_sample_input() if input_method == "Single Sample" else batch_c
 # -------------------------------
 if st.button("Predict Quality"):
     if input_df is not None and not input_df.empty:
-        Xt = input_df[feature_cols]
-        pred_prob = pipeline.predict_proba(Xt)[:, 1]
-        pred_class = pipeline.predict(Xt)
+        # Transform using preprocessor
+        Xt = preprocessor.transform(input_df)
+        preds = pipeline.predict(Xt)
+        probs = pipeline.predict_proba(Xt)
 
         st.markdown("### Prediction Results:")
-        for i, pred in enumerate(pred_class):
-            label = "GOOD" if pred == 1 else "NOT GOOD"
-            confidence = pred_prob[i] * 100
+        for i, pred in enumerate(preds):
+            label = "Good 🍷" if pred == 1 else "Not Good ❌"
+            confidence = probs[i][pred] * 100
             st.write(f"**Prediction:** {label}")
             st.write(f"**Confidence:** {confidence:.2f} percent")
-            st.write("---")
+            if len(preds) > 1:
+                st.write("---")  # separator for batch inputs

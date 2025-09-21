@@ -53,7 +53,7 @@ def single_sample_input():
     with col2:
         data['total_sulfur_dioxide'] = st.number_input("Total Sulfur Dioxide", value=46.0, format="%.2f")
         data['density'] = st.number_input("Density", value=0.99600, format="%.5f")
-        data['pH'] = st.number_input("pH", value=3.3, format="%.2f")
+        data['ph'] = st.number_input("ph", value=3.3, format="%.2f")
         data['sulphates'] = st.number_input("Sulphates", value=0.65, format="%.2f")
         data['alcohol'] = st.number_input("Alcohol", value=10.0, format="%.2f")
         data['acidity_ratio'] = st.number_input("Acidity Ratio", value=7.0/0.3, format="%.3f")

@@ -6,7 +6,6 @@ This Streamlit web application allows users to predict whether a red wine sample
 The app supports:  
 - **Single sample input** via sidebar  
 - **Batch prediction** via CSV upload  
-- **Feature importance visualization**  
 
 ---
 
